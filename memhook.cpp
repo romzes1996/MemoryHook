@@ -2,6 +2,7 @@
 
 typedef void* (*MallocType)(size_t);
 typedef void (*FreeType)(void*);
+typedef void* (*ReallocType)(void*, size_t);
 
 void setGuard(unsigned char *ptr, unsigned char val)
 {
@@ -65,4 +66,21 @@ void free(void* ptr)
 	(*origFree)(ptr);
 
 	assert(flag);
+}
+
+void* realloc (void* ptr, size_t size)
+{
+	ReallocType origRealloc = (ReallocType)dlsym(RTLD_NEXT, "realloc");
+	
+	ptr = toHookPtr(ptr);
+	ptr = (*origRealloc)(ptr, toHookSize(size));
+
+	printf("%ld bytes were reallocated\n", size);
+	unsigned char *tmp = (unsigned char*)ptr;
+	*tmp = size;
+	setGuard(tmp + 1, 0xAA); //front guard
+	setGuard(tmp + 1 + GUARD_SIZE + size, 0xBB); //rear guard
+
+	ptr = toUsrPtr(ptr);
+	return ptr;
 }
