@@ -35,19 +35,25 @@ void* toUsrPtr(void *ptr)
 	return tmp + GUARD_SIZE + 1;
 }
 
+void *setGuards(void *ptr, size_t size)
+{
+	unsigned char *tmp = (unsigned char*)ptr;
+	*tmp = size;
+	setGuard(tmp + 1, 0xAA); //front guard
+	setGuard(tmp + 1 + GUARD_SIZE + size, 0xBB); //rear guard
+
+	ptr = toUsrPtr(ptr);
+	return ptr;
+}
+
 void* malloc(size_t size)
 {
 	MallocType origMalloc = (MallocType)dlsym(RTLD_NEXT, "malloc");
 	void *res = (*origMalloc)(toHookSize(size));
 
 	printf("%ld bytes were allocated\n", size);
-	unsigned char *tmp = (unsigned char*)res;
-	*tmp = size;
-	setGuard(tmp + 1, 0xAA); //front guard
-	setGuard(tmp + 1 + GUARD_SIZE + size, 0xBB); //rear guard
-
-	res = toUsrPtr(res);
-	return res;
+	
+	return setGuards(res, size);
 }
 
 void free(void* ptr)
@@ -76,11 +82,6 @@ void* realloc (void* ptr, size_t size)
 	ptr = (*origRealloc)(ptr, toHookSize(size));
 
 	printf("%ld bytes were reallocated\n", size);
-	unsigned char *tmp = (unsigned char*)ptr;
-	*tmp = size;
-	setGuard(tmp + 1, 0xAA); //front guard
-	setGuard(tmp + 1 + GUARD_SIZE + size, 0xBB); //rear guard
-
-	ptr = toUsrPtr(ptr);
-	return ptr;
+	
+	return setGuards(ptr, size);
 }
